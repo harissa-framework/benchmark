@@ -1,0 +1,90 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "harissa-benchmark"
+authors = [
+    { name="Ulysse Herbach", email="ulysse.herbach@inria.fr" },
+]
+description = "Tools for mechanistic gene network inference from single-cell data"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+license = { file = "LICENSE.txt" }
+# license-files = { paths = ["LICENSE.txt"] }
+keywords = [
+    "stochastic gene expression",
+    "gene regulatory networks",
+    "single-cell transcriptomics",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "harissa",
+    # "harissa>=4.0", when v4 is release on PyPI 
+]
+dynamic = ["version"]
+
+# [project.optional-dependencies]
+# extra = ["alive-progress>=3.0", "umap-learn"]
+
+[project.urls]
+Repository = "https://github.com/harissa-framework/benchmark"
+# Documentation = "https://harissa-framework.github.io/harissa"
+# "Repository (legacy)" = "https://github.com/ulysseherbach/harissa"
+
+# [project.scripts]
+# harissa = "harissa.utils.cli:main"
+
+# Tools config
+
+# Hatch
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src"]
+
+[tool.hatch.version]
+source = "vcs"
+raw-options = { local_scheme = "no-local-version" }
+
+# Ruff
+
+[tool.ruff]
+select = ["E", "F"]
+line-length = 79
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+
+# Pytest
+
+# [tool.pytest.ini_options]
+# minversion = "6.0"
+# required_plugins = ["pytest-cov"]
+# addopts = [
+#     "--import-mode=importlib",
+#     "--junit-xml=report.xml",
+#     "--cov",
+#     "--cov-append",
+#     "--cov-report=lcov",
+#     "--cov-report=html",
+#     "--cov-report=term"
+# ]
+# testpaths = ["tests"]
+
+# [tool.coverage.run]
+# source = ['harissa']
+# branch = true
+# omit = ['*/harissa/plot/*', '*/harissa/utils/cli/*']
+
+# [tool.coverage.report]
+# fail_under = 80
+
+# [tool.coverage.html]
+# directory = "coverage"
