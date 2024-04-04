@@ -25,8 +25,9 @@ keywords = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    "harissa",
-    # "harissa>=4.0", when v4 is release on PyPI 
+    "harissa[extra]",
+# "harissa[extra]>=4.0", when v4 is release on PyPI 
+    "scikit-learn"
 ]
 dynamic = ["version"]
 
