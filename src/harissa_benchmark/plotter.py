@@ -47,9 +47,9 @@ class InteractionPlotter:
         x, y = self.roc(score)
         return auc(x, y), (x, y) 
 
-    def plot_roc(self, scores, ax):
+    def plot_rocs(self, scores, ax):
         """
-        Plot a ROC curve (see function `roc`).
+        Plot mutiple ROC curves (see function `roc`).
         """
         ax.plot([0,1], [0,1], color='gray', ls='--', label='Random (0.50)')
         for score in scores:
@@ -79,9 +79,9 @@ class InteractionPlotter:
         x, y, _ = self.pr(score)
         return auc(x,y), (x, y)
 
-    def plot_pr(self, scores, ax):
+    def plot_prs(self, scores, ax):
         """
-        Plot a PR curve (see function `pr`).
+        Plot multiple PR curves (see function `pr`).
         """
         b = np.mean(self.inter)
         ax.plot([0,1], [b,b], color='gray', ls='--')
@@ -95,8 +95,8 @@ class InteractionPlotter:
         ax.legend(loc='lower right')
 
     plot_types = {
-        'roc': plot_roc,
-        'pr' : plot_pr
+        'roc': plot_rocs,
+        'pr' : plot_prs
     }
 
     def show_plot(self, scores, plot_type):
@@ -117,5 +117,5 @@ class InteractionPlotter:
         self.plot_types[plot_type](scores, ax)
 
         if file is None: 
-            file = 'roc.pdf'
+            file = f'{plot_type}.pdf'
         fig.savefig(file, dpi=100, bbox_inches='tight', frameon=False)
