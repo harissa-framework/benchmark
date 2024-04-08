@@ -33,4 +33,4 @@ def create_bn8():
 
     return bn8
 
-NetworksGenerator.register_networks('bn8', create_bn8())
+NetworksGenerator.register('BN8', create_bn8)
