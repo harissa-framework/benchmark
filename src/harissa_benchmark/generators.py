@@ -144,7 +144,9 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
     ) -> None:
         super().__init__('datasets', path)
             
-        self.networks_generator = networks_generator or NetworksGenerator(path)
+        self.networks_generator = (
+            networks_generator or NetworksGenerator(path=path)
+        )
     
         self.model = NetworkModel(simulation=BurstyPDMP(
             # use_numba=True
@@ -202,7 +204,7 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
         print(f'Datasets saved at {path.absolute()}')
 
 class InferencesGenerator(GenericGenerator[Inference]):
-    _inferences : Dict[str, Callable[[], Inference]] = {}
+    _inferences : Dict[str, Tuple[Callable[[], Inference], Dict]] = {}
 
     def __init__(self,
         # path: Optional[Union[str, Path]] = None, 
@@ -219,11 +221,12 @@ class InferencesGenerator(GenericGenerator[Inference]):
     @classmethod
     def register(cls, 
         name: str, 
-        inference_callable: Callable[[], Inference]
+        inference_callable: Callable[[], Inference],
+        **kwargs
     ) -> None:
         if isinstance(inference_callable, Callable):
             if name not in cls._inferences:
-                cls._inferences[name] = inference_callable
+                cls._inferences[name] = (inference_callable, kwargs)
             else:
                 raise ValueError((f'{name} is already taken. '
                                   f'Cannot register {inference_callable}.'))
@@ -242,9 +245,9 @@ class InferencesGenerator(GenericGenerator[Inference]):
     
     def _generate(self) -> None:
         self._items = {}
-        for name, inference_callable in self._inferences.items():
+        for name, (inference_callable, kwargs) in self._inferences.items():
             if name in self._include and name not in self._exclude:
-                inference = inference_callable()
+                inference = inference_callable(**kwargs)
                 if isinstance(inference, Inference):
                     self._items[name] = inference
                 else:
@@ -268,8 +271,8 @@ class ScoresGenerator(GenericGenerator[
         super().__init__('scores', path)
 
         self.generators = [
-            datasets_generator or DatasetsGenerator(path),
-            inferences_generator or InferencesGenerator(path)
+            datasets_generator or DatasetsGenerator(path=path),
+            inferences_generator or InferencesGenerator()
         ]
         self.model = NetworkModel()
         self.n_scores = n_scores
@@ -285,11 +288,11 @@ class ScoresGenerator(GenericGenerator[
         for network_dir in path.iterdir():
             network_name = network_dir.stem
             self._items[network_name] = {}
-            with np.load(network_name / 'runtimes.npz') as data:
+            with np.load(network_dir / 'runtimes.npz') as data:
                 runtimes = dict(data)
 
             for inference_dir in network_dir.iterdir():
-                if inference_dir.isdir():
+                if inference_dir.is_dir():
                     inference_name = inference_dir.stem
                     title = (f'Loading {inference_name} scores '
                             f'for {network_name} network.')
