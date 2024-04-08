@@ -1,9 +1,10 @@
 from pathlib import Path
 from importlib import import_module
 
-def collect_modules(init_file, modules):
-    for path in Path(init_file).parent.iterdir():
-        module = path.stem
-        if not module.startswith('_'):
-            import_module(f'harissa_benchmark.networks.{module}')
-            modules.append(module)
+def collect_submodules(init_file, modules):
+    module = Path(init_file).parent
+    for path in module.iterdir():
+        submodule = path.stem
+        if not submodule.startswith('_'):
+            import_module(f'harissa_benchmark.{module.stem}.{submodule}')
+            modules.append(submodule)

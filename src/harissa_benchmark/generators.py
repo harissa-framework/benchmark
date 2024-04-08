@@ -82,7 +82,7 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
                 raise ValueError((f'{name} is already taken. '
                                   f'Cannot register {network_callable}.'))
         else:
-            raise TypeError(('network_generator must be a callable '
+            raise TypeError(('network_callable must be a callable '
                              'that returns a NetworkParameter.'))
     
     # Alias
@@ -105,7 +105,12 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
         self._items = {}
         for name, network_callable in self._networks.items():
             if name in self._include and name not in self._exclude:
-                self._items[name] = network_callable()
+                network = network_callable()
+                if isinstance(network, NetworkParameter):
+                    self._items[name] = network
+                else:
+                    raise RuntimeError((f'{network_callable} is not a callable'
+                                         ' that returns a NetworkParameter.'))
         
     def _save(self, path: Path) -> None:
         with alive_bar(len(self.networks)) as bar:
@@ -188,22 +193,54 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
 class InferencesGenerator(GenericGenerator[Inference]):
     _inferences : Dict[str, Callable[[], Inference]] = {}
 
+    def __init__(self,
+        # path: Optional[Union[str, Path]] = None, 
+        include: Optional[List[str]] = None, 
+        exclude: Optional[List[str]] = None
+    ) -> None:
+        self._include = include or list(self._inferences.keys())
+        self._exclude = exclude or []
+
+        super().__init__('networks',
+            # path
+        )
+
     @classmethod
     def register(cls, 
         name: str, 
-        inference_cls: Callable[[], Inference]
+        inference_callable: Callable[[], Inference]
     ) -> None:
-        if issubclass(inference_cls, Inference):
+        if isinstance(inference_callable, Callable):
             if name not in cls._inferences:
-                cls._inferences[name] = inference_cls
+                cls._inferences[name] = inference_callable
             else:
                 raise ValueError((f'{name} is already taken. '
-                                  f'Cannot register {inference_cls}.'))
+                                  f'Cannot register {inference_callable}.'))
         else:
-            raise TypeError(('inference_generator must be an '
-                             'Inference sub class.'))
+            raise TypeError(('inference_callable must be a callable '
+                             'that returns a Inference sub class.'))
+
+    # Alias
+    @property
+    def inferences(self):
+        return self.items
 
     @classmethod
     def available_inferences(cls) -> List[str]:
         return list(cls._inferences.keys())
+    
+    def _generate(self) -> None:
+        self._items = {}
+        for name, inference_callable in self._networks.items():
+            if name in self._include and name not in self._exclude:
+                inference = inference_callable()
+                if isinstance(inference, Inference):
+                    self._items[name] = inference
+                else:
+                    raise RuntimeError(
+                        (f'{inference_callable} is not a callable'
+                          ' that returns a Inference sub class.')
+                    )
+                
+    
 
