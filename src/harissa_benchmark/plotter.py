@@ -1,6 +1,6 @@
 """Some utility functions for benchmarking Harissa"""
 
-from typing import List, Tuple, Union, Optional
+from typing import Dict, Tuple, Union, Optional
 from pathlib import Path
 
 import numpy as np
@@ -8,8 +8,6 @@ import numpy.typing as npt
 from sklearn.metrics import roc_curve, precision_recall_curve, auc
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
-
-from harissa import NetworkParameter
 
 def _prepare_matrix(matrix: npt.NDArray[np.float_]) -> npt.NDArray[np.float_]:
     n = matrix.shape[0]
@@ -21,12 +19,12 @@ def _prepare_matrix(matrix: npt.NDArray[np.float_]) -> npt.NDArray[np.float_]:
 
     # assert matrix[mask].shape == (n*(n - 2) + 1,)
 
-    return np.abs(matrix[mask])
+    return np.clip(np.abs(matrix[mask]), 0.0, 1.0)
 
 
 class InteractionPlotter:
-    def __init__(self, network_parameter: NetworkParameter) -> None:
-        self._inter = _prepare_matrix(network_parameter.interaction)
+    def __init__(self, inter: npt.NDArray[np.float_]) -> None:
+        self._inter = _prepare_matrix(inter)
 
     @property
     def inter(self) -> npt.NDArray[np.float_]:
@@ -58,14 +56,14 @@ class InteractionPlotter:
         x, y = self.roc(score)
         return auc(x, y), (x, y) 
 
-    def plot_rocs(self, scores: list[NetworkParameter], ax) -> None:
+    def plot_rocs(self, scores: Dict[str, npt.NDArray[np.float_]], ax) -> None:
         """
         Plot mutiple ROC curves (see function `roc`).
         """
+        for inference_name, score in scores.items():
+            auc, curve = self.auroc(score)
+            ax.plot(*curve, label=f'{inference_name} ({auc:.2f})')
         ax.plot([0,1], [0,1], color='gray', ls='--', label='Random (0.50)')
-        for score in scores:
-            auc, curve = self.auroc(score.interaction)
-            ax.plot(*curve, label=f'Score ({auc:.2f})')
         # ax.set_xlim(0,1)
         # ax.set_ylim(0)
         ax.set_xlabel('False positive rate')
@@ -91,18 +89,18 @@ class InteractionPlotter:
         """
         Area under PR curve (see function `pr`).
         """
-        x, y, _ = self.pr(score)
+        x, y = self.pr(score)
         return auc(x,y), (x, y)
 
-    def plot_prs(self, scores: List[NetworkParameter], ax) -> None:
+    def plot_prs(self, scores: Dict[str, npt.NDArray[np.float_]], ax) -> None:
         """
         Plot multiple PR curves (see function `pr`).
         """
+        for inference_name, score in scores.items():
+            auc, curve = self.aupr(score)
+            ax.plot(*curve, label=f'{inference_name} ({auc:.2f})')
         b = np.mean(self.inter)
-        ax.plot([0,1], [b,b], color='gray', ls='--')
-        for score in scores:
-            auc, curve = self.aupr(score.interaction)
-            ax.plot(*curve, label=f'Score ({auc:.2f})')
+        ax.plot([0,1], [b,b], color='gray', ls='--', label=f'Random ({b:.2f})')
         ax.set_xlim(0,1)
         ax.set_ylim(0)
         ax.set_xlabel('Recall')
@@ -110,7 +108,7 @@ class InteractionPlotter:
         ax.legend(loc='lower right')
 
     def show_plot(self,
-        scores: List[NetworkParameter], 
+        scores: Dict[str, npt.NDArray[np.float_]], 
         plot_type: str
     ) -> None:
         fig = plt.figure(figsize=(5,5), dpi=100)
@@ -119,11 +117,11 @@ class InteractionPlotter:
 
         getattr(self, f'plot_{plot_type}s')(scores, ax)
 
-        fig.show()
+        fig.show(warn=False)
 
 
     def save_plot(self, 
-        scores: List[NetworkParameter], 
+        scores: Dict[str, npt.NDArray[np.float_]], 
         plot_type: str,
         file: Optional[Union[str, Path]] = None
     ) -> None:
