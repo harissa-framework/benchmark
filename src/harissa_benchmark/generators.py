@@ -317,7 +317,7 @@ class ScoresGenerator(GenericGenerator[
                 with alive_bar(n_scores, title=title) as bar:
                     for i in range(n_scores):
                         start = perf_counter()
-                        results[i] = self.model.fit(datasets[i])
+                        results[i] = self.model.fit(datasets[i]).parameter
                         runtime[i] = perf_counter() - start
                         bar()
 
