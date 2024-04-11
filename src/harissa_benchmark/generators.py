@@ -47,7 +47,12 @@ class GenericGenerator(Generic[T]):
     
     def generate(self, force_generation: bool = False) -> None:
         if self._items is None or force_generation:
-            self._generate()
+            try:
+                self._generate()
+            except BaseException as e:
+                self._items = None
+                raise e
+
 
     def save(self, path: Union[str, Path] = Path.cwd()) -> Path:
         self.generate()
@@ -149,7 +154,7 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
         )
     
         self.model = NetworkModel(simulation=BurstyPDMP(
-            # use_numba=True
+            use_numba=True
         ))
         self.simulate_dataset_parameters = {
             'time_points': time_points, 
@@ -177,29 +182,35 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
 
     def _generate(self) -> None:
         self._items = {}
-        for name, network in self.networks_generator.networks.items():
-            self.model.parameter = network
-            self._items[name] = [
-                self.model.simulate_dataset(**self.simulate_dataset_parameters) 
-                for _ in alive_it(
-                    range(self.n_datasets),
-                    title=f'Generating {name} datasets'
-                )
-            ]
+        with alive_bar(
+            len(self.networks_generator.networks) * self.n_datasets,
+            title='Generating datasets'
+        ) as bar:
+            for name, network in self.networks_generator.networks.items():
+                self.model.parameter = network
+                self._items[name] = [None] * self.n_datasets
+                for i in range(self.n_datasets):
+                    bar.text(f'Generating {name} - dataset {i+1}')
+                    self._items[name][i] = self.model.simulate_dataset(
+                        **self.simulate_dataset_parameters
+                    )
+                    bar()
     
     def _save(self, path: Path) -> None:
         self.networks_generator.save(path.parent)
-        for name, datasets in self.datasets.items():
-            output = path / name
-            output.mkdir(parents=True, exist_ok=True)
+        with alive_bar(
+            int(np.sum([len(d) for d in self.datasets.values()])),
+            title='Saving datasets'
+        ) as bar:
+            for name, datasets in self.datasets.items():
+                output = path / name
+                output.mkdir(parents=True, exist_ok=True)
 
-            with alive_bar(
-                len(datasets),
-                title=f'Saving {name} datasets', 
-            ) as bar:
                 for i, dataset in enumerate(datasets):
-                    dataset.save(output / f'dataset_{i + 1}')
-                bar()
+                    output_dataset = output / f'dataset_{i + 1}'
+                    bar.text(f'Saving {output_dataset.absolute()}')
+                    dataset.save(output_dataset)
+                    bar()
 
         print(f'Datasets saved at {path.absolute()}')
 
@@ -259,7 +270,7 @@ class InferencesGenerator(GenericGenerator[Inference]):
 class ScoresGenerator(GenericGenerator[
     Dict[
         str,
-        List[Tuple[NetworkParameter, npt.NDArray[np.float_]]]
+        Tuple[List[NetworkParameter], npt.NDArray[np.float_]]
     ]
 ]):
     def __init__(self,
@@ -306,40 +317,49 @@ class ScoresGenerator(GenericGenerator[
 
     def _generate(self) -> None:
         self._items = {}
-        for net_name, datasets in self.generators[0].datasets.items():
-            self._items[net_name] = {}
-            for inf_name, inference in self.generators[1].inferences.items():
-                title = f'Generating {inf_name} scores for {net_name} network'
-                n_scores = len(datasets)
-                runtime = np.zeros(n_scores)
-                results = [None] * n_scores
-                self.model.inference = inference
-                with alive_bar(n_scores, title=title) as bar:
+        with alive_bar(
+            len(self.generators[1].items) 
+            * int(np.sum([len(d) for d in self.generators[0].items.values()])),
+            title='Generating scores'
+        ) as bar:
+            for net_name, datasets in self.generators[0].items.items():
+                self._items[net_name] = {}
+                for inf_name, inference in self.generators[1].items.items():
+                    n_scores = len(datasets)
+                    runtime = np.zeros(n_scores)
+                    results = [None] * n_scores
+                    self.model.inference = inference
                     for i in range(n_scores):
+                        bar.text(f'Score {net_name}-{inf_name}-{i+1}')
                         start = perf_counter()
                         results[i] = self.model.fit(datasets[i]).parameter
                         runtime[i] = perf_counter() - start
                         bar()
 
-                self._items[net_name][inf_name] = (results, runtime)
+                    self._items[net_name][inf_name] = (results, runtime)
     
     def _save(self, path: Path) -> None:
         self.generators[0].save(path.parent)
-        for network, inferences in self.scores.items():
-            network_path = path / network
-            runtimes = {}
-            for inference, (scores, runtime)  in inferences.items():
-                output = network_path / inference
-                output.mkdir(parents=True, exist_ok=True)
-                runtimes[inference] = runtime
-                with alive_bar(
-                    len(scores),
-                    title=f'Saving {inference} scores for {network} network', 
-                ) as bar:
-                    for i, network_parameter in enumerate(scores):
-                        network_parameter.save(output / f'score_{i + 1}')
+        with alive_bar(
+            int(np.sum([
+                len(s) 
+                for inf_s in self.scores.values() 
+                for s, _ in inf_s.values()
+            ])),
+            title='Saving Scores'
+        ) as bar:
+            for network, inferences_score in self.scores.items():
+                network_path = path / network
+                runtimes = {}
+                for inference, (scores, rts)  in inferences_score.items():
+                    output = network_path / inference
+                    output.mkdir(parents=True, exist_ok=True)
+                    runtimes[inference] = rts
+                    for i, ntw_param in enumerate(scores):
+                        output_score = ntw_param.save(output / f'score_{i+1}')
+                        bar.text(f'{output_score.absolute()} saved')
                         bar()
 
-            np.savez_compressed(network_path / 'runtimes.npz', **runtimes)
+                np.savez_compressed(network_path / 'runtimes.npz', **runtimes)
         
         print(f'Scores saved at {path.absolute()}')        

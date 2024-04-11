@@ -10,5 +10,8 @@ __all__ = ['ScoresGenerator', 'available_networks', 'available_inferences']
 _cfh.set_global(
     spinner=_bsf('🌶', 6, hide=False),
     dual_line=True,
-    receipt=False
+    receipt=False,
+    force_tty=True,
+    length=20,
+    max_cols=100
 )
