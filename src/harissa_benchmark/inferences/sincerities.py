@@ -1,18 +1,19 @@
-# This module implements the SINCERITIES algorithm [Papili Gao et al., 2018].
-#
-# Reference
-# ---------
-# Papili Gao et al., SINCERITIES: Inferring gene regulatory networks
-# from time-stamped single cell transcriptional expression profiles.
-# Bioinformatics, 34(2):258–266, 2018.
+""" 
+This module implements the SINCERITIES algorithm [Papili Gao et al., 2018].
 
-from harissa.core.dataset import Dataset
+Reference
+---------
+Papili Gao et al., SINCERITIES: Inferring gene regulatory networks
+from time-stamped single cell transcriptional expression profiles.
+Bioinformatics, 34(2):258–266, 2018.
+"""
+
 import numpy as np
 from scipy import sparse
 from sklearn.linear_model import ElasticNet
 from sklearn.covariance import EmpiricalCovariance
 
-from harissa.core import Inference, NetworkParameter
+from harissa.core import Inference, NetworkParameter, Dataset
 from harissa_benchmark.generators import InferencesGenerator
 
 def ksdistance(x1, x2):

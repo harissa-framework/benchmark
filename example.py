@@ -1,7 +1,6 @@
 from harissa_benchmark import ScoresGenerator
+from harissa_benchmark.generators import DatasetsGenerator
 
-gen = ScoresGenerator()
+gen = ScoresGenerator(datasets_generator=DatasetsGenerator(path='datagen'))
 
-gen.generate()
-
-gen.save('datagen5')
+gen.save('datagen')
