@@ -1,6 +1,6 @@
 """Some utility functions for benchmarking Harissa"""
 
-from typing import Dict, Tuple, List, Union, Optional
+from typing import Dict, Tuple, Union, Optional
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 
 from harissa import NetworkParameter
+from harissa_benchmark.benchmark import ScoreInfo
+from harissa_benchmark.generators import InferencesGenerator
 
 def _prepare_score(matrix: npt.NDArray[np.float_]) -> npt.NDArray[np.float_]:
     n = matrix.shape[0]
@@ -29,6 +31,7 @@ def _prepare_inter(matrix):
 class InteractionPlotter:
     def __init__(self, network: NetworkParameter) -> None:
         self._inter = _prepare_inter(network.interaction)
+        self.alpha = 0.4
 
     @property
     def inter(self) -> npt.NDArray[np.float_]:
@@ -59,44 +62,10 @@ class InteractionPlotter:
         """
         x, y = self.roc(score)
         return auc(x, y), (x, y) 
-
-    def plot_roc(self,
-        scores: Dict[str, npt.NDArray[np.float_]],
-        ax: Optional[plt.Axes] = None,
-        path: Optional[Union[str, Path]] = None
-    ) -> None:
-        """
-        Plot mutiple ROC curves (see function `roc`).
-        """
-        show_plot = path is None and ax is None
-        if ax is None:
-            fig = plt.figure(figsize=(5,5), dpi=100)
-            grid = gs.GridSpec(1,1)
-            ax = fig.add_subplot(grid[0,0])
-
-        for inference_name, score in scores.items():
-            auc, curve = self.auroc(score)
-            ax.plot(*curve, label=f'{inference_name} ({auc:.2f})')
-        ax.plot([0,1], [0,1], color='gray', ls='--', label='Random (0.50)')
-        # ax.set_xlim(0,1)
-        # ax.set_ylim(0)
-        ax.set_xlabel('False positive rate')
-        ax.set_ylabel('True positive rate')
-        ax.legend(loc='lower right')
-
-        if path is not None:
-            plt.gcf().savefig(
-                path, 
-                dpi=100, 
-                bbox_inches='tight', 
-                frameon=False
-            )
-        elif show_plot:
-            plt.gcf().show()
     
 # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html
     def plot_rocs(self, 
-        scores: Dict[str,Tuple[List[NetworkParameter],npt.NDArray[np.float_]]],
+        scores: Dict[str, ScoreInfo],
         ax: Optional[plt.Axes] = None,
         path: Optional[Union[str, Path]] = None
     ) -> None:
@@ -109,28 +78,33 @@ class InteractionPlotter:
             grid = gs.GridSpec(1,1)
             ax = fig.add_subplot(grid[0,0])
 
-        for name, (networks_param, _) in scores.items():
-            aucs = np.empty(len(networks_param))
+        for name, score_info in scores.items():
+            aucs = np.empty(len(score_info.results))
             x = np.linspace(0, 1, 1000)
-            ys = np.empty((len(networks_param), x.size))
-            for i, network_param in enumerate(networks_param):
+            ys = np.empty((len(score_info.results), x.size))
+            for i, network_param in enumerate(score_info.results):
                 aucs[i], curve = self.auroc(network_param.interaction)
                 interpolated_y = np.interp(x, *curve)
                 interpolated_y[0] = 0.0
-                # ax.plot(x, interpolated_y, alpha=0.2, label=f'{name} ({aucs[i]:.2f})')
 
                 ys[i] = interpolated_y
             
             y = np.mean(ys, axis=0)
             y[-1] = 1.0
             std_y = np.std(ys, axis=0)
-            p = ax.plot(x, y, label=f'{name} ({np.mean(aucs):.2f} $\pm$ {np.std(aucs):.2f})')
+            inf_info = InferencesGenerator.getInferenceInfo(name)
+            ax.plot(
+                x, 
+                y,
+                color=inf_info.colors[0], 
+                label=f'{name} ({np.mean(aucs):.2f} $\pm$ {np.std(aucs):.2f})'
+            )
             ax.fill_between(
                 x, 
                 np.maximum(y - std_y, 0.0), 
                 np.minimum(y + std_y, 1.0),
-                color=p[-1].get_color(),
-                alpha=0.2
+                color=inf_info.colors[1],
+                alpha=self.alpha
             )
         ax.plot([0,1], [0,1], color='gray', ls='--', label='Random (0.50)')
         # ax.set_xlim(0,1)
@@ -172,44 +146,8 @@ class InteractionPlotter:
         x, y = self.pr(score)
         return auc(x,y), (x, y)
 
-    def plot_pr(self, 
-        scores: Dict[str, npt.NDArray[np.float_]], 
-        ax: Optional[plt.Axes] = None,
-        path: Optional[Union[str, Path]] = None
-    ) -> None:
-        """
-        Plot mutiple ROC curves (see function `roc`).
-        """
-        show_plot = path is None and ax is None
-        if ax is None:
-            fig = plt.figure(figsize=(5,5), dpi=100)
-            grid = gs.GridSpec(1,1)
-            ax = fig.add_subplot(grid[0,0])
-
-        for inference_name, score in scores.items():
-            auc, curve = self.aupr(score)
-            ax.plot(*curve, label=f'{inference_name} ({auc:.2f})')
-        b = np.mean(self.inter)
-        ax.plot([0,1], [b,b], color='gray', ls='--', label=f'Random ({b:.2f})')
-        
-        ax.set_xlim(0,1)
-        ax.set_ylim(0)
-        ax.set_xlabel('Recall')
-        ax.set_ylabel('Precision')
-        ax.legend(loc='lower right')
-
-        if path is not None:
-            plt.gcf().savefig(
-                path, 
-                dpi=100, 
-                bbox_inches='tight', 
-                frameon=False
-            )
-        elif show_plot:
-            plt.gcf().show()
-
     def plot_prs(self,
-        scores: Dict[str,Tuple[List[NetworkParameter],npt.NDArray[np.float_]]],
+        scores: Dict[str, ScoreInfo],
         ax: Optional[plt.Axes] = None,
         path: Optional[Union[str, Path]] = None
     ) -> None:
@@ -222,27 +160,32 @@ class InteractionPlotter:
             grid = gs.GridSpec(1,1)
             ax = fig.add_subplot(grid[0,0])
 
-        for name, (networks_param, _) in scores.items():
-            aucs = np.empty(len(networks_param))
+        for name, score_info in scores.items():
+            aucs = np.empty(len(score_info.results))
             x = np.linspace(0, 1, 1000)
-            ys = np.empty((len(networks_param), x.size))
-            for i, network_param in enumerate(networks_param):
+            ys = np.empty((len(score_info.results), x.size))
+            for i, network_param in enumerate(score_info.results):
                 aucs[i], curve = self.aupr(network_param.interaction)
                 interpolated_y = np.interp(x, *curve)
                 interpolated_y[0] = 1.0
-                # ax.plot(x, interpolated_y, alpha=0.2, label=f'{name} ({aucs[i]:.2f})')
 
                 ys[i] = interpolated_y
             
             y = np.mean(ys, axis=0)
             std_y = np.std(ys, axis=0)
-            p = ax.plot(x, y, label=f'{name} ({np.mean(aucs):.2f} $\pm$ {np.std(aucs):.2f})')
+            inf_info = InferencesGenerator.getInferenceInfo(name)
+            ax.plot(
+                x, 
+                y,
+                color=inf_info.colors[0], 
+                label=f'{name} ({np.mean(aucs):.2f} $\pm$ {np.std(aucs):.2f})'
+            )
             ax.fill_between(
                 x,
                 np.maximum(y - std_y, 0.0),
                 np.minimum(y + std_y, 1.0),
-                color=p[-1].get_color(),
-                alpha=0.2
+                color=inf_info.colors[1],
+                alpha=self.alpha
             )
 
         b = np.mean(self.inter)

@@ -2,7 +2,7 @@ import numpy as np
 from scipy import stats
 
 from harissa.core import Inference, NetworkParameter, Dataset
-from harissa_benchmark.generators import InferencesGenerator
+from harissa_benchmark.generators import InferencesGenerator, InferenceInfo
 
 class Pearson(Inference):
     def run(self, dataset: Dataset) -> Inference.Result:
@@ -22,4 +22,12 @@ class Pearson(Inference):
         return Inference.Result(param)
     
 
-InferencesGenerator.register('Pearson', Pearson)
+InferencesGenerator.register(
+    'Pearson', 
+    InferenceInfo(
+        Pearson,
+        False,
+        np.array([InferencesGenerator.color_map(14),
+                  InferencesGenerator.color_map(15)])
+    )
+)

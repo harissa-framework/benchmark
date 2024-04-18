@@ -5,7 +5,7 @@ from operator import itemgetter
 from multiprocessing import Pool
 
 from harissa.core import Inference, Dataset, NetworkParameter
-from harissa_benchmark.generators import InferencesGenerator
+from harissa_benchmark.generators import InferencesGenerator, InferenceInfo
 
 def compute_feature_importances(estimator):
     if isinstance(estimator, BaseDecisionTree):
@@ -447,4 +447,12 @@ class Genie3(Inference):
         return Inference.Result(param)
     
 
-InferencesGenerator.register('Genie3', Genie3)
+InferencesGenerator.register(
+    'Genie3', 
+    InferenceInfo(
+        Genie3,
+        True,
+        array([InferencesGenerator.color_map(0),
+               InferencesGenerator.color_map(1)])
+    )
+)

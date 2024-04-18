@@ -14,7 +14,7 @@ from sklearn.linear_model import ElasticNet
 from sklearn.covariance import EmpiricalCovariance
 
 from harissa.core import Inference, NetworkParameter, Dataset
-from harissa_benchmark.generators import InferencesGenerator
+from harissa_benchmark.generators import InferencesGenerator, InferenceInfo
 
 def ksdistance(x1, x2):
     """
@@ -150,4 +150,12 @@ class Sincerities(Inference):
 
         return Inference.Result(param)
 
-InferencesGenerator.register("Sincerities", Sincerities)
+InferencesGenerator.register(
+    'Sincerities', 
+    InferenceInfo(
+        Sincerities,
+        True,
+        np.array([InferencesGenerator.color_map(2),
+                  InferencesGenerator.color_map(3)])
+    )
+)

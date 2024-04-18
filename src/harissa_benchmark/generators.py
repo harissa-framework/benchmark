@@ -9,12 +9,15 @@ from typing import (
     Optional
 )
 
+from dataclasses import dataclass
 from pathlib import Path
-from time import perf_counter
-from alive_progress import alive_bar, alive_it
+from alive_progress import alive_bar
 
+import matplotlib.colors
+import matplotlib.pyplot
 import numpy as np
 import numpy.typing as npt
+import matplotlib
 
 from harissa import Dataset, NetworkParameter, NetworkModel
 from harissa.core import Inference
@@ -112,10 +115,15 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
 
     def _load(self, path: Path) -> None:
         self._items = {}
-        for p in path.iterdir():
-            name = p.stem
-            if name in self._include and name not in self._exclude:
-                self._items[name] = NetworkParameter.load(p)
+        paths = [
+            p for p in path.iterdir() 
+            if p.stem in self._include and p.stem not in self._exclude
+        ]
+        with alive_bar(len(paths), title='Loading Networks parameters') as bar:
+            for p in path.iterdir():
+                bar.text(f'Loading {p.absolute()}')
+                self._items[p.stem] = NetworkParameter.load(p)
+                bar()
         
     def _generate(self) -> None:
         self._items = {}
@@ -134,7 +142,105 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
                 network.save(path / name)
             bar()
         print(f'Networks saved at {path.absolute()}')
-        
+
+@dataclass
+class InferenceInfo:
+    inference: Union[Inference, Callable[[], Inference]]
+    is_directed_graph: bool
+    colors: npt.NDArray
+
+class InferencesGenerator(GenericGenerator[Inference]):
+    _inferences : Dict[str, InferenceInfo] = {}
+    color_map: matplotlib.colors.Colormap = matplotlib.pyplot.get_cmap('tab20')
+
+    def __init__(self,
+        path: Optional[Union[str, Path]] = None, 
+        include: Optional[List[str]] = None, 
+        exclude: Optional[List[str]] = None
+    ) -> None:
+        self._include = include or list(self._inferences.keys())
+        self._exclude = exclude or []
+
+        super().__init__('inferences', path)
+
+    @classmethod
+    def register(cls, name: str, inference_info: InferenceInfo) -> None:
+        if name not in cls._inferences:
+            if isinstance(inference_info.inference, (Inference, Callable)):
+                cls._inferences[name] = inference_info
+            else:
+                raise TypeError(('inference_callable must be a callable '
+                             'that returns a Inference sub class.'))
+        else:
+            raise ValueError((f'{name} is already taken. '
+                              f'Cannot register {inference_info}.'))
+
+    # Alias
+    @property
+    def inferences(self):
+        return self.items
+
+    @classmethod
+    def available_inferences(cls) -> List[str]:
+        return list(cls._inferences.keys())
+    
+    @classmethod
+    def getInferenceInfo(cls, name: str) -> InferenceInfo:
+        return cls._inferences[name]
+    
+    def _load(self, path: Path) -> None:
+        with alive_bar(
+            len(list(path.iterdir())),
+            title='Loading inferences info'
+        ) as bar:
+            for p in path.iterdir():
+                name = p.stem
+                if name not in self._include and name not in self._include:
+                    self._include.append(name)
+                    if name not in self._inferences:
+                        with np.load(p, allow_pickle=True) as data:
+                            self.register(name, InferenceInfo(
+                                data['inference'].item(),
+                                data['is_directed_graph'].item(),
+                                data['colors']
+                            ))
+                bar()
+        self.generate(force_generation=True)
+
+
+    def _generate(self) -> None:
+        self._items = {}
+        for name, inf_info in self._inferences.items():
+            if name in self._include and name not in self._exclude:
+                if isinstance(inf_info.inference, Inference):
+                    inference = inf_info.inference
+                else:
+                    inference = inf_info.inference()
+                
+                if isinstance(inference, Inference):
+                    self._items[name] = inference
+                else:
+                    raise RuntimeError(
+                        (f'{inf_info.inference} is not a callable'
+                          ' that returns a Inference sub class.')
+                    )
+                
+    def _save(self, path: Path) -> None:
+        with alive_bar(
+            len(self.inferences), 
+            title='Saving Inferences Info'
+        ) as bar:
+            for inf_name in self.inferences:
+                output = (path / inf_name).with_suffix('.npz')
+                bar.text(f'{output.absolute()}')
+                info = self._inferences[inf_name]
+                np.savez_compressed(
+                    output,
+                    inference=np.array(info.inference),
+                    is_directed_graph=np.array(info.is_directed_graph),
+                    colors=info.colors
+                ) 
+
     
 class DatasetsGenerator(GenericGenerator[List[Dataset]]):
     def __init__(self, 
@@ -170,15 +276,17 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
     
     def _load(self, path: Path) -> None:
         self._items = {}
-        for network_dir in path.iterdir():
-            name = network_dir.stem
-            self._items[name] = [
-                Dataset.load(dataset_file)
-                for dataset_file in alive_it(
-                    network_dir.iterdir(),
-                    title=f'Loading {name} datasets'
-                )
-            ]
+        with alive_bar(
+            int(np.sum([len(list(p.iterdir())) for p in path.iterdir()])),
+            title='Loading datasets'
+        ) as bar:
+            for network_dir in path.iterdir():
+                name = network_dir.stem
+                self._items[name] = [None] * len(list(network_dir.iterdir()))
+                for i, dataset_file in enumerate(network_dir.iterdir()):
+                    bar.text(f'Loading {name} datasets {i}')
+                    self._items[name][i] = Dataset.load(dataset_file) 
+                    bar()
 
     def _generate(self) -> None:
         self._items = {}
@@ -214,152 +322,3 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
 
         print(f'Datasets saved at {path.absolute()}')
 
-class InferencesGenerator(GenericGenerator[Inference]):
-    _inferences : Dict[str, Tuple[Callable[[], Inference], Dict]] = {}
-
-    def __init__(self,
-        # path: Optional[Union[str, Path]] = None, 
-        include: Optional[List[str]] = None, 
-        exclude: Optional[List[str]] = None
-    ) -> None:
-        self._include = include or list(self._inferences.keys())
-        self._exclude = exclude or []
-
-        super().__init__('networks',
-            # path
-        )
-
-    @classmethod
-    def register(cls, 
-        name: str, 
-        inference_callable: Callable[[], Inference],
-        **kwargs
-    ) -> None:
-        if isinstance(inference_callable, Callable):
-            if name not in cls._inferences:
-                cls._inferences[name] = (inference_callable, kwargs)
-            else:
-                raise ValueError((f'{name} is already taken. '
-                                  f'Cannot register {inference_callable}.'))
-        else:
-            raise TypeError(('inference_callable must be a callable '
-                             'that returns a Inference sub class.'))
-
-    # Alias
-    @property
-    def inferences(self):
-        return self.items
-
-    @classmethod
-    def available_inferences(cls) -> List[str]:
-        return list(cls._inferences.keys())
-    
-    def _generate(self) -> None:
-        self._items = {}
-        for name, (inference_callable, kwargs) in self._inferences.items():
-            if name in self._include and name not in self._exclude:
-                inference = inference_callable(**kwargs)
-                if isinstance(inference, Inference):
-                    self._items[name] = inference
-                else:
-                    raise RuntimeError(
-                        (f'{inference_callable} is not a callable'
-                          ' that returns a Inference sub class.')
-                    )
-                
-class ScoresGenerator(GenericGenerator[
-    Dict[
-        str,
-        Tuple[List[NetworkParameter], npt.NDArray[np.float_]]
-    ]
-]):
-    def __init__(self,
-        datasets_generator: Optional[DatasetsGenerator] = None,
-        inferences_generator: Optional[InferencesGenerator] = None,
-        n_scores: int = 10, 
-        path: Optional[Union[str, Path]] = None
-    ) -> None:
-        super().__init__('scores', path)
-
-        self.generators = [
-            datasets_generator or DatasetsGenerator(path=path),
-            inferences_generator or InferencesGenerator()
-        ]
-        self.model = NetworkModel()
-        self.n_scores = n_scores
-
-
-    # Alias
-    @property  
-    def scores(self):
-        return self.items
-
-    def _load(self, path: Path) -> None:
-        self._items = {}
-        for network_dir in path.iterdir():
-            network_name = network_dir.stem
-            self._items[network_name] = {}
-            with np.load(network_dir / 'runtimes.npz') as data:
-                runtimes = dict(data)
-
-            for inference_dir in network_dir.iterdir():
-                if inference_dir.is_dir():
-                    inference_name = inference_dir.stem
-                    title = (f'Loading {inference_name} scores '
-                            f'for {network_name} network.')
-                    self._items[network_name][inference_name] = ([
-                        NetworkParameter.load(score_file)
-                        for score_file in alive_it(
-                            inference_dir.iterdir(),
-                            title=title
-                        )
-                    ], runtimes[inference_name])
-
-    def _generate(self) -> None:
-        self._items = {}
-        with alive_bar(
-            len(self.generators[1].items) 
-            * int(np.sum([len(d) for d in self.generators[0].items.values()])),
-            title='Generating scores'
-        ) as bar:
-            for net_name, datasets in self.generators[0].items.items():
-                self._items[net_name] = {}
-                for inf_name, inference in self.generators[1].items.items():
-                    n_scores = len(datasets)
-                    runtime = np.zeros(n_scores)
-                    results = [None] * n_scores
-                    self.model.inference = inference
-                    for i in range(n_scores):
-                        bar.text(f'Score {net_name}-{inf_name}-{i+1}')
-                        start = perf_counter()
-                        results[i] = self.model.fit(datasets[i]).parameter
-                        runtime[i] = perf_counter() - start
-                        bar()
-
-                    self._items[net_name][inf_name] = (results, runtime)
-    
-    def _save(self, path: Path) -> None:
-        self.generators[0].save(path.parent)
-        with alive_bar(
-            int(np.sum([
-                len(s) 
-                for inf_s in self.scores.values() 
-                for s, _ in inf_s.values()
-            ])),
-            title='Saving Scores'
-        ) as bar:
-            for network, inferences_score in self.scores.items():
-                network_path = path / network
-                runtimes = {}
-                for inference, (scores, rts)  in inferences_score.items():
-                    output = network_path / inference
-                    output.mkdir(parents=True, exist_ok=True)
-                    runtimes[inference] = rts
-                    for i, ntw_param in enumerate(scores):
-                        output_score = ntw_param.save(output / f'score_{i+1}')
-                        bar.text(f'{output_score.absolute()} saved')
-                        bar()
-
-                np.savez_compressed(network_path / 'runtimes.npz', **runtimes)
-        
-        print(f'Scores saved at {path.absolute()}')        
