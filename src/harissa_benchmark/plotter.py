@@ -69,7 +69,7 @@ class DirectedPlotter:
         return auc(x, y), (x, y) 
     
 # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html
-    def plot_rocs(self, 
+    def plot_roc_curves(self, 
         scores: Dict[str, ScoreInfo],
         ax: Optional[plt.Axes] = None,
         path: Optional[Union[str, Path]] = None
@@ -155,7 +155,7 @@ class DirectedPlotter:
         x, y = self.pr(score)
         return auc(x,y), (x, y)
 
-    def plot_prs(self,
+    def plot_pr_curves(self,
         scores: Dict[str, ScoreInfo],
         ax: Optional[plt.Axes] = None,
         path: Optional[Union[str, Path]] = None
