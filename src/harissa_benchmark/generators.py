@@ -22,6 +22,7 @@ import matplotlib
 from harissa import Dataset, NetworkParameter, NetworkModel
 from harissa.core import Inference
 from harissa.simulation import BurstyPDMP
+from harissa_benchmark.utils import match, match_rec
 
 T = TypeVar('T')
 
@@ -46,7 +47,11 @@ class GenericGenerator(Generic[T]):
         if not path.is_dir():
             raise ValueError(f'{path} must be an existing directory.')
         
-        self._load(path)
+        try:
+            self._load(path)
+        except BaseException as e:
+            self._items = None
+            raise e
     
     def generate(self, force_generation: bool = False) -> None:
         if self._items is None or force_generation:
@@ -84,7 +89,7 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
         include: Optional[List[str]] = None, 
         exclude: Optional[List[str]] = None
     ) -> None:
-        self._include = include or list(self._networks.keys())
+        self._include = include or ['**']
         self._exclude = exclude or []
 
         super().__init__('networks', path)
@@ -115,26 +120,31 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
 
     def _load(self, path: Path) -> None:
         self._items = {}
-        paths = [
-            p for p in path.iterdir() 
-            if p.stem in self._include and p.stem not in self._exclude
-        ]
+        
+        paths = match_rec(path, self._include, self._exclude)
+
         with alive_bar(len(paths), title='Loading Networks parameters') as bar:
-            for p in path.iterdir():
+            for p in paths:
                 bar.text(f'Loading {p.absolute()}')
-                self._items[p.stem] = NetworkParameter.load(p)
+                name = str(p.relative_to(path).with_suffix(''))
+                self._items[name] = NetworkParameter.load(p)
                 bar()
         
     def _generate(self) -> None:
         self._items = {}
-        for name, network_callable in self._networks.items():
-            if name in self._include and name not in self._exclude:
+        networks = {
+            k:n for k,n  in self._networks.items() 
+            if match(k, self._include, self._exclude) 
+        }
+        with alive_bar(len(networks), title='Generating networks') as bar:
+            for name, network_callable in networks.items():
                 network = network_callable()
                 if isinstance(network, NetworkParameter):
                     self._items[name] = network
                 else:
                     raise RuntimeError((f'{network_callable} is not a callable'
-                                         ' that returns a NetworkParameter.'))
+                                        ' that returns a NetworkParameter.'))
+                bar()
         
     def _save(self, path: Path) -> None:
         with alive_bar(len(self.networks)) as bar:
@@ -158,7 +168,7 @@ class InferencesGenerator(GenericGenerator[Inference]):
         include: Optional[List[str]] = None, 
         exclude: Optional[List[str]] = None
     ) -> None:
-        self._include = include or list(self._inferences.keys())
+        self._include = include or ['**']
         self._exclude = exclude or []
 
         super().__init__('inferences', path)
@@ -188,43 +198,56 @@ class InferencesGenerator(GenericGenerator[Inference]):
     def getInferenceInfo(cls, name: str) -> InferenceInfo:
         return cls._inferences[name]
     
+    def _generate_inference(self, name, inf_info):
+        if isinstance(inf_info.inference, Inference):
+            inference = inf_info.inference
+        else:
+            inference = inf_info.inference()
+        
+        if isinstance(inference, Inference):
+            self._items[name] = inference
+        else:
+            raise RuntimeError(
+                (f'{inf_info.inference} is not a callable'
+                ' that returns a Inference sub class.')
+            )
+    
     def _load(self, path: Path) -> None:
+        self._items = {}
+        paths = match_rec(path, self._include, self._exclude)
         with alive_bar(
-            len(list(path.iterdir())),
+            len(paths),
             title='Loading inferences info'
         ) as bar:
-            for p in path.iterdir():
-                name = p.stem
-                if name not in self._include and name not in self._include:
-                    self._include.append(name)
+            for p in paths:
+                bar.text(f'{p.absolute()}')
+                name = str(p.relative_to(path).with_suffix(''))
+                with np.load(p, allow_pickle=True) as data:
+                    inf_info = InferenceInfo(
+                            data['inference'].item(),
+                            data['is_directed_graph'].item(),
+                            data['colors']
+                        )
                     if name not in self._inferences:
-                        with np.load(p, allow_pickle=True) as data:
-                            self.register(name, InferenceInfo(
-                                data['inference'].item(),
-                                data['is_directed_graph'].item(),
-                                data['colors']
-                            ))
+                        self.register(name, inf_info)
+                    
+                    self._generate_inference(name, inf_info)
+                
                 bar()
-        self.generate(force_generation=True)
 
 
     def _generate(self) -> None:
         self._items = {}
-        for name, inf_info in self._inferences.items():
-            if name in self._include and name not in self._exclude:
-                if isinstance(inf_info.inference, Inference):
-                    inference = inf_info.inference
-                else:
-                    inference = inf_info.inference()
-                
-                if isinstance(inference, Inference):
-                    self._items[name] = inference
-                else:
-                    raise RuntimeError(
-                        (f'{inf_info.inference} is not a callable'
-                          ' that returns a Inference sub class.')
-                    )
-                
+        inferences = {
+            k:i for k,i in self._inferences.items()
+            if match(k, self._include, self._exclude)
+        }
+        with alive_bar(len(inferences), title='Generating inferences') as bar:
+            for name, inf_info in inferences.items():
+                bar.text(f'{name}')
+                self._generate_inference(name, inf_info)
+                bar()
+    
     def _save(self, path: Path) -> None:
         with alive_bar(
             len(self.inferences), 
@@ -239,10 +262,12 @@ class InferencesGenerator(GenericGenerator[Inference]):
                     inference=np.array(info.inference),
                     is_directed_graph=np.array(info.is_directed_graph),
                     colors=info.colors
-                ) 
+                )
+
+        print(f'Inferences saved at {path.absolute()}')     
 
     
-class DatasetsGenerator(GenericGenerator[List[Dataset]]):
+class DatasetsGenerator(GenericGenerator[npt.NDArray[Dataset]]):
     def __init__(self, 
         networks_generator: Optional[NetworksGenerator] = None,
         time_points : npt.NDArray[np.float_] = np.array([
@@ -271,22 +296,22 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
 
     # Alias
     @property
-    def datasets(self) -> Dict[str, List[Dataset]]:
+    def datasets(self) -> Dict[str, npt.NDArray[Dataset]]:
         return self.items
     
     def _load(self, path: Path) -> None:
         self._items = {}
+        paths = match_rec(path, suffix='.npy')
         with alive_bar(
-            int(np.sum([len(list(p.iterdir())) for p in path.iterdir()])),
+            len(paths),
             title='Loading datasets'
         ) as bar:
-            for network_dir in path.iterdir():
-                name = network_dir.stem
-                self._items[name] = [None] * len(list(network_dir.iterdir()))
-                for i, dataset_file in enumerate(network_dir.iterdir()):
-                    bar.text(f'Loading {name} datasets {i}')
-                    self._items[name][i] = Dataset.load(dataset_file) 
-                    bar()
+            for p in paths:
+                bar.text(f'{p.absolute()}')
+                name = str(p.relative_to(path).with_suffix(''))
+                
+                self._items[name] = np.load(p, allow_pickle=True)
+                bar()
 
     def _generate(self) -> None:
         self._items = {}
@@ -296,7 +321,7 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
         ) as bar:
             for name, network in self.networks_generator.networks.items():
                 self.model.parameter = network
-                self._items[name] = [None] * self.n_datasets
+                self._items[name] = np.empty(self.n_datasets, dtype=object)
                 for i in range(self.n_datasets):
                     bar.text(f'Generating {name} - dataset {i+1}')
                     self._items[name][i] = self.model.simulate_dataset(
@@ -306,19 +331,14 @@ class DatasetsGenerator(GenericGenerator[List[Dataset]]):
     
     def _save(self, path: Path) -> None:
         self.networks_generator.save(path.parent)
-        with alive_bar(
-            int(np.sum([len(d) for d in self.datasets.values()])),
-            title='Saving datasets'
-        ) as bar:
+        with alive_bar(len(self.datasets), title='Saving datasets') as bar:
             for name, datasets in self.datasets.items():
                 output = path / name
-                output.mkdir(parents=True, exist_ok=True)
+                output.parent.mkdir(parents=True, exist_ok=True)
 
-                for i, dataset in enumerate(datasets):
-                    output_dataset = output / f'dataset_{i + 1}'
-                    bar.text(f'Saving {output_dataset.absolute()}')
-                    dataset.save(output_dataset)
-                    bar()
+                bar.text(f'{output.absolute()}')
+                np.save(output, datasets)
+                bar()
 
         print(f'Datasets saved at {path.absolute()}')
 
