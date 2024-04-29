@@ -6,8 +6,9 @@ build-backend = "hatchling.build"
 name = "harissa-benchmark"
 authors = [
     { name="Ulysse Herbach", email="ulysse.herbach@inria.fr" },
+    { name="Nathaniel Seyler", email="nathaniel.seyler@loria.fr" }
 ]
-description = "Tools for mechanistic gene network inference from single-cell data"
+description = "Benchmark for Harissa's inference and simulation methods"
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -27,17 +28,13 @@ requires-python = ">=3.8"
 dependencies = [
     "harissa[extra]",
 # "harissa[extra]>=4.0", when v4 is release on PyPI 
-    "scikit-learn"
+    "scikit-learn",
 ]
 dynamic = ["version"]
 
-# [project.optional-dependencies]
-# extra = ["alive-progress>=3.0", "umap-learn"]
-
 [project.urls]
 Repository = "https://github.com/harissa-framework/benchmark"
-# Documentation = "https://harissa-framework.github.io/harissa"
-# "Repository (legacy)" = "https://github.com/ulysseherbach/harissa"
+Documentation = "https://harissa-framework.github.io/benchmark"
 
 # [project.scripts]
 # harissa = "harissa.utils.cli:main"
