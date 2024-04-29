@@ -12,12 +12,10 @@ def collect_submodules(init_file, submodules):
 
 def match(path, include_patterns = ['**'], exclude_patterns = [], suffix = ''):
     path = Path(path)
+
     return (
-        any(
-            [path.match(f'{pattern}{suffix}') for pattern in include_patterns]
-        ) and all(
-            [~path.match(f'{pattern}{suffix}') for pattern in exclude_patterns]
-        )
+        any([path.match(f'{p}{suffix}') for p in include_patterns]) 
+        and all([not path.match(f'{p}{suffix}') for p in exclude_patterns])
     )
 
 def match_rec(
@@ -31,7 +29,12 @@ def match_rec(
             if p.is_dir():
                 for sub_p in p.iterdir():
                     acc = add_paths(sub_p, acc)
-            elif match(p, include_patterns, exclude_patterns, suffix):
+            elif match(
+                p.relative_to(path), 
+                include_patterns, 
+                exclude_patterns, 
+                suffix
+            ):
                 acc = add_paths(None, acc + [p])
         
         return acc
