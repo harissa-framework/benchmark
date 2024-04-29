@@ -97,17 +97,17 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
     @classmethod
     def register(cls, 
         name: str, 
-        network_callable: Callable[[], NetworkParameter]
+        network: Union[NetworkParameter, Callable[[], NetworkParameter]]
     ) -> None:
-        if isinstance(network_callable, Callable):
+        if isinstance(network, (NetworkParameter, Callable)):
             if name not in cls._networks:
-                cls._networks[name] = network_callable
+                cls._networks[name] = network
             else:
                 raise ValueError((f'{name} is already taken. '
-                                  f'Cannot register {network_callable}.'))
+                                  f'Cannot register {network}.'))
         else:
-            raise TypeError(('network_callable must be a callable '
-                             'that returns a NetworkParameter.'))
+            raise TypeError(('network must be a NetworkParameter or a '
+                             'callable that returns a NetworkParameter.'))
     
     # Alias
     @property
@@ -137,12 +137,13 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
             if match(k, self._include, self._exclude) 
         }
         with alive_bar(len(networks), title='Generating networks') as bar:
-            for name, network_callable in networks.items():
-                network = network_callable()
+            for name, network in networks.items():
+                if isinstance(network, Callable):
+                    network = network()
                 if isinstance(network, NetworkParameter):
                     self._items[name] = network
                 else:
-                    raise RuntimeError((f'{network_callable} is not a callable'
+                    raise RuntimeError((f'{network} is not a callable'
                                         ' that returns a NetworkParameter.'))
                 bar()
         
