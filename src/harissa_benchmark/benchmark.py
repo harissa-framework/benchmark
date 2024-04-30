@@ -48,6 +48,18 @@ class Benchmark(GenericGenerator[Dict[str, ScoreInfo]]):
     @property  
     def scores(self):
         return self.items
+    
+    @property
+    def networks(self):
+        return self.generators[0].networks_generator.networks
+    
+    @property
+    def datasets(self):
+        return self.generators[0].datasets
+    
+    @property
+    def inferences(self):
+        return self.generators[1].inferences
 
     def _load(self, path: Path) -> None:
         self._items = {}
@@ -76,13 +88,13 @@ class Benchmark(GenericGenerator[Dict[str, ScoreInfo]]):
         self._items = {}
         with alive_bar(
             self.n_scores
-            * len(self.generators[1].items) 
-            * int(np.sum([d.size for d in self.generators[0].items.values()])),
+            * len(self.inferences) 
+            * int(np.sum([d.size for d in self.datasets.values()])),
             title='Generating scores'
         ) as bar:
-            for net_name, datasets in self.generators[0].items.items():
+            for net_name, datasets in self.datasets.items():
                 self._items[net_name] = {}
-                for inf_name, inference in self.generators[1].items.items():
+                for inf_name, inference in self.inferences.items():
                     n_dataset = datasets.size
                     runtime= np.zeros((n_dataset, self.n_scores))
                     results= np.empty((n_dataset, self.n_scores), dtype=object)
