@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 
 from harissa import NetworkParameter
+from harissa.plot import build_pos, plot_network
 from harissa_benchmark.benchmark import ScoreInfo
 from harissa_benchmark.generators import InferencesGenerator, InferenceInfo
 
@@ -25,8 +26,7 @@ def _plot_decorator(plot_func):
         show_plot = path is None and ax is None
         if ax is None:
             fig = plt.figure(figsize=(5,5), dpi=100)
-            grid = gs.GridSpec(1,1)
-            ax = fig.add_subplot(grid[0,0])
+            ax = fig.add_subplot()
 
         plot_func(self, scores, ax)
 
@@ -45,16 +45,18 @@ class DirectedPlotter:
         network: NetworkParameter, 
         alpha_curve_std: float = 0.2
         ) -> None:
-        self._inter = self._prepare_inter(network.interaction)
+        self.inter = network.interaction
+        self._truth = self._prepare_truth(self.inter)
         self.alpha_curve_std = alpha_curve_std
 
     @property
-    def inter(self) -> npt.NDArray[np.float_]:
-        return self._inter
+    def truth(self) -> npt.NDArray[np.float_]:
+        return self._truth
     
-    @inter.setter
-    def inter(self, inter: npt.NDArray[np.float_]):
-        self._inter = self._prepare_inter(inter)    
+    @truth.setter
+    def truth(self, inter: npt.NDArray[np.float_]):
+        self.inter = inter
+        self._truth = self._prepare_truth(inter)    
 
     def _prepare_score(self, 
         matrix: npt.NDArray[np.float_]
@@ -70,11 +72,19 @@ class DirectedPlotter:
 
         return np.abs(matrix[mask])
 
-    def _prepare_inter(self, matrix):
+    def _prepare_truth(self, matrix):
         return 1.0 * (self._prepare_score(matrix) > 0)
     
     def _accept_inference(self, inference_info: InferenceInfo) -> bool:
         return inference_info.is_directed_graph
+    
+    
+    def plot_network(self, pos=None, **kwargs):
+        if pos is None:
+            pos = build_pos(self.inter)
+
+        plot_network(self.inter, pos, **kwargs)
+
 
     def roc(self, 
         score: npt.NDArray[np.float_]
@@ -85,7 +95,7 @@ class DirectedPlotter:
         * score[i,j] is the estimated score of interaction i -> j
         * inter[i,j] = 1 if i -> j is present and 0 otherwise.
         """
-        x, y, _ = roc_curve(self.inter, self._prepare_score(score))
+        x, y, _ = roc_curve(self.truth, self._prepare_score(score))
         return x, y
 
     def auroc(self, 
@@ -150,7 +160,7 @@ class DirectedPlotter:
         * inter[i,j] = 1 if i -> j is present and 0 otherwise.
         """
         y, x, _ = precision_recall_curve(
-            self.inter, 
+            self.truth, 
             self._prepare_score(score)
         )
 
@@ -174,7 +184,7 @@ class DirectedPlotter:
         Plot multiple PR curves (see function `pr`).
         """
         self._plot_curves(scores, self.pr, ax)
-        b = np.mean(self.inter)
+        b = np.mean(self.truth)
         ax.plot(
             [0,1], 
             [b,b], 
@@ -196,7 +206,7 @@ class DirectedPlotter:
     ) -> None:
 
         self._plot_boxes_auc(scores, self.aupr, ax)
-        b = np.mean(self.inter)
+        b = np.mean(self.truth)
         left, right = ax.get_xlim()
         ax.plot(
             [left, right], 
@@ -209,6 +219,7 @@ class DirectedPlotter:
         ax.set_xlim(left, right)
         ax.set_ylim(0,1)
         ax.set_ylabel('AUPR', fontsize=6)
+
 
     # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html
     def _plot_curves(self, scores, curve_fn, ax):
