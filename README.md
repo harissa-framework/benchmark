@@ -3,15 +3,18 @@ Benchmark for Harissa's inference and simulation methods.
 
 ## Installation
 
-`harissa-benchmark` depends on the version 4.0.0 of [harissa](https://github.com/harissa-framework/harissa). 
+`harissa-benchmark` depends on the version 4.1.0 of [harissa](https://github.com/harissa-framework/harissa). 
 This version is not released yet, so to be able to use this package you need to
-clone the `harissa` repository and install it in local (with the extra dependencies).
+clone the `harissa` repository, switch branch to `add-cardamom` 
+and install it in local (with the extra dependencies).
 You can use a virtual environment if you have another version of harissa installed.
 Now that you have the correct version of `harissa`
 you can install `harissa-benchmark`.
 
 ```console
 git clone https://github.com/harissa-framework/harissa.git
+cd harissa
+git checkout add-cardamom
 pip install .[extra]
 pip install harissa-benchmark
 ```
@@ -30,7 +33,7 @@ print(available_inferences())
 To run a benchmark on those and generate scores, you only need to import the
 `Benchmark` class and to call its method `generate`. 
 The generated scores will be accessible inside the attribute `items` or the property
-`scores`. 
+`scores`.
 
 ```python
 from harissa_benchmark import Benchmark
