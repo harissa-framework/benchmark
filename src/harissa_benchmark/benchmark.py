@@ -20,7 +20,9 @@ from harissa_benchmark.generators import (
     InferencesGenerator
 )
 
+from harissa.plot import build_pos
 from harissa_benchmark.utils import match_rec
+from harissa_benchmark.plotters import plot_all_directed, plot_all_undirected
 
 @dataclass
 class ScoreInfo:
@@ -136,5 +138,30 @@ class Benchmark(GenericGenerator[Dict[str, ScoreInfo]]):
 
                     np.savez_compressed(output, **asdict(score_info))
                     bar()
-        
-        print(f'Scores saved at {path.absolute()}')
+
+    def reports(self, show_networks=False):
+        networks_pos = [
+            build_pos(n.interaction) for n in self.networks.values()
+        ]
+        return [
+            plot_all_directed(
+                self.networks, 
+                self.scores, 
+                networks_pos, 
+                show_networks
+            ), 
+            plot_all_undirected(
+                self.networks, 
+                self.scores, 
+                networks_pos, 
+                show_networks
+            )
+        ]
+
+    def save_reports(self, path: Union[str, Path]) -> Path:
+        path = Path(path)
+        for fname, fig in zip(
+            ['directed.pdf', 'undirected.pdf'], self.reports()
+        ):
+            fig.savefig(path / fname)
+        return path

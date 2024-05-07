@@ -1,7 +1,6 @@
 from typing import (
     Dict, 
     List, 
-    Tuple, 
     Callable, 
     Generic, 
     TypeVar, 
@@ -10,6 +9,8 @@ from typing import (
 )
 
 from dataclasses import dataclass
+from tempfile import TemporaryDirectory
+from shutil import make_archive, unpack_archive
 from pathlib import Path
 from alive_progress import alive_bar
 
@@ -42,16 +43,25 @@ class GenericGenerator(Generic[T]):
         self.generate()
         return self._items
 
-    def load(self, path: Union[str, Path]) -> None:
-        path = Path(path) / self.sub_directory_name
-        if not path.is_dir():
-            raise ValueError(f'{path} must be an existing directory.')
+    def load(self, path: Union[str, Path]) -> None:        
+        def __load(p : Path):
+            p = p / self.sub_directory_name
+            if not p.is_dir():
+                raise ValueError(f'{p} must be an existing directory.')
         
-        try:
-            self._load(path)
-        except BaseException as e:
-            self._items = None
-            raise e
+            try:
+                self._load(p)
+            except BaseException as e:
+                self._items = None
+                raise e
+            
+        path = Path(path)
+        if path.suffix != '':
+            with TemporaryDirectory() as tmp_dir:
+                unpack_archive(path, tmp_dir)
+                __load(Path(tmp_dir))
+        else:
+            __load(path)
     
     def generate(self, force_generation: bool = False) -> None:
         if self._items is None or force_generation:
@@ -62,14 +72,29 @@ class GenericGenerator(Generic[T]):
                 raise e
 
 
-    def save(self, path: Union[str, Path] = Path.cwd()) -> Path:
+    def save(self, 
+        path: Union[str, Path], 
+        archive_format: Optional[str] = None
+    ) -> Path:
         self.generate()
 
-        output = Path(path).with_suffix('') / self.sub_directory_name
-        output.mkdir(parents=True, exist_ok=True)
-        self._save(output)
+        path = Path(path).with_suffix('')
+        if archive_format is not None:
+            with TemporaryDirectory() as tmp_dir:
+                self._save(Path(tmp_dir) / self.sub_directory_name)
+                with alive_bar(
+                    title='Archiving', 
+                    monitor=False, 
+                    stats= False
+                ) as bar:
+                    path=Path(make_archive(str(path), archive_format, tmp_dir))
+                    bar()
+        else:
+            output = path / self.sub_directory_name
+            output.mkdir(parents=True, exist_ok=True)
+            self._save(output)
 
-        return output
+        return path.absolute()
     
     def _load(self, path: Path) -> None:
         raise NotImplementedError
@@ -152,7 +177,6 @@ class NetworksGenerator(GenericGenerator[NetworkParameter]):
             for name, network in self.networks.items():
                 network.save(path / name)
             bar()
-        print(f'Networks saved at {path.absolute()}')
 
 @dataclass
 class InferenceInfo:
@@ -263,9 +287,7 @@ class InferencesGenerator(GenericGenerator[Inference]):
                     inference=np.array(info.inference),
                     is_directed_graph=np.array(info.is_directed_graph),
                     colors=info.colors
-                )
-
-        print(f'Inferences saved at {path.absolute()}')     
+                )     
 
     
 class DatasetsGenerator(GenericGenerator[npt.NDArray[Dataset]]):
@@ -340,6 +362,3 @@ class DatasetsGenerator(GenericGenerator[npt.NDArray[Dataset]]):
                 bar.text(f'{output.absolute()}')
                 np.save(output, datasets)
                 bar()
-
-        print(f'Datasets saved at {path.absolute()}')
-

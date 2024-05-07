@@ -1,5 +1,6 @@
 """Some utility functions for benchmarking Harissa"""
 
+from __future__ import annotations
 from typing import Dict, Tuple, Union, Optional
 from pathlib import Path
 from functools import wraps
@@ -13,7 +14,7 @@ import matplotlib.gridspec as gs
 
 from harissa import NetworkParameter
 from harissa.plot import build_pos, plot_network
-from harissa_benchmark.benchmark import ScoreInfo
+# from harissa_benchmark.benchmark import ScoreInfo
 from harissa_benchmark.generators import InferencesGenerator, InferenceInfo
 
 def _plot_decorator(plot_func):
@@ -304,3 +305,72 @@ class UnDirectedPlotter(DirectedPlotter):
 
     def _accept_inference(self, inference_info: InferenceInfo) -> bool:
         return True
+    
+
+
+def _plot_all(networks, networks_pos, scores, Plotter, show_networks):
+    nb_networks = len(networks)
+    nb_colum = 4 + show_networks
+    scale = 5
+    fig = plt.figure(figsize=(scale*nb_colum, scale*len(networks)))
+    grid = gs.GridSpec(nb_networks, nb_colum)
+
+    for i, (net_name, network) in enumerate(networks.items()):
+        plotter = Plotter(network)
+        axs = []
+        if show_networks:
+            axs.append(fig.add_subplot(grid[i, 0]))
+            plotter.plot_network(networks_pos[i], axes=axs[0], scale=scale*2.1)
+            
+        axs= axs+[fig.add_subplot(grid[i, show_networks+j]) for j in range(4)]
+
+            
+        sc = scores[net_name]
+        plotter.plot_roc_curves(sc, axs[show_networks+0])
+        plotter.plot_roc_boxes(sc, axs[show_networks+1])
+        plotter.plot_pr_curves(sc, axs[show_networks+2])
+        plotter.plot_pr_boxes(sc, axs[show_networks+3])
+
+        axs[0].text(
+            -0.095, 
+            0.875, 
+            net_name, 
+            bbox={
+                'boxstyle':'round,pad=0.2',
+                'fc':'none',
+                'ec':'lightgray',
+                'lw':0.8
+            },
+            fontsize=9,
+            transform=axs[0].transAxes,
+            ha='right'
+        )
+        
+
+        if i < nb_networks - 1:
+            for ax in axs:
+                ax.set_xlabel('')
+
+    return fig
+
+def plot_all_directed(networks, scores, networks_pos=None, show_networks=True):
+    if networks_pos is None:
+        networks_pos = [build_pos(n) for n in networks]
+    return _plot_all(
+        networks, 
+        networks_pos, 
+        scores, 
+        DirectedPlotter, 
+        show_networks
+    )
+
+def plot_all_undirected(networks, scores, networks_pos=None, show_networks=True):
+    if networks_pos is None:
+        networks_pos = [build_pos(n) for n in networks]
+    return _plot_all(
+        networks, 
+        networks_pos, 
+        scores, 
+        UnDirectedPlotter, 
+        show_networks
+    )
