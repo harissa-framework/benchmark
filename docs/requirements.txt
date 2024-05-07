@@ -1,0 +1,8 @@
+harissa
+sphinx
+furo
+ipython
+myst-parser
+myst-nb
+sphinx-copybutton
+sphinx-collections
