@@ -5,7 +5,6 @@ from operator import itemgetter
 from multiprocessing import Pool
 
 from harissa.core import Inference, Dataset, NetworkParameter
-from harissa_benchmark.generators import InferencesGenerator, InferenceInfo
 
 def compute_feature_importances(estimator):
     if isinstance(estimator, BaseDecisionTree):
@@ -438,21 +437,13 @@ def genie3_single(expr_data,output_idx,input_idx,tree_method,K,n_trees):
 
 
 class Genie3(Inference):
-    def run(self, data: Dataset) -> Inference.Result:
-        score = genie3(data.count_matrix)
-
-        param = NetworkParameter(data.count_matrix.shape[1] - 1)
-        param.interaction[:] = score
-
+    def run(self,
+        data: Dataset,
+        param: NetworkParameter
+    ) -> Inference.Result:
+        param.interaction[:] = genie3(data.count_matrix)
         return Inference.Result(param)
     
-
-InferencesGenerator.register(
-    'Genie3', 
-    InferenceInfo(
-        Genie3,
-        True,
-        array([InferencesGenerator.color_map(0),
-               InferencesGenerator.color_map(1)])
-    )
-)
+    @property    
+    def directed(self) -> bool:
+        return True

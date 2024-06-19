@@ -6,8 +6,7 @@ from tempfile import TemporaryDirectory
 from alive_progress import alive_bar
 
 from harissa import Dataset
-from harissa_benchmark.generators import NetworksGenerator
-from harissa_benchmark.networks.trees import create_tree
+from harissa.benchmark.generators.networks import NetworksGenerator, tree
 
 def convert(cardamom_article, output_dir):
     deterministic_networks = ['BN8', 'CN5', 'FN4', 'FN8']
@@ -24,15 +23,15 @@ def convert(cardamom_article, output_dir):
             
             if folder_name in deterministic_networks:
                 # save datasets
-                datasets = np.empty(len(old_datasets), dtype=object)
-                for i, path in enumerate(old_datasets):
+                for i, path in enumerate(old_datasets, 1):
                     old_dataset = np.loadtxt(path, dtype=int, delimiter='\t')
-                    datasets[i] = Dataset(
-                        old_dataset[0, 1:].astype(np.float_), 
+                    dataset = Dataset(
+                        old_dataset[0, 1:].astype(np.float_),
                         old_dataset[1:, 1:].T.astype(np.uint)
                     )
-                datasets_output.parent.mkdir(parents=True, exist_ok=True)
-                np.save(datasets_output.with_suffix('.npy'), datasets)
+                    
+                    datasets_output.mkdir(parents=True, exist_ok=True)
+                    dataset.save(datasets_output / f'd{i}.npz')
             else:
                 assert folder_name.startswith('Trees')
 
@@ -44,22 +43,21 @@ def convert(cardamom_article, output_dir):
                 for path in inters:
                     tree_name = f'{path.stem.split("_")[1]}.npz'
                     inter = np.load(path)
-                    network = create_tree(inter.shape[1] - 1)
+                    network = tree(inter.shape[1] - 1)
                     # override interaction matrix
                     network.interaction[:] = inter
                     network.save(networks_output / tree_name)
                 # save datasets
                 for path in old_datasets:
+                    tree_name = path.stem.split("_")[1]
                     old_dataset = np.loadtxt(path, dtype=int, delimiter='\t')
-                    datasets = np.array([
-                        Dataset(
-                            old_dataset[0, 1:].astype(np.float_), 
-                            old_dataset[1:, 1:].T.astype(np.uint)
-                        )
-                    ], dtype=object)
-                    output = datasets_output / f'{path.stem.split("_")[1]}.npy'
+                    dataset = Dataset(
+                        old_dataset[0, 1:].astype(np.float_),
+                        old_dataset[1:, 1:].T.astype(np.uint)
+                    )
+                    output = datasets_output/ tree_name / 'd1.npz'
                     output.parent.mkdir(parents=True, exist_ok=True)
-                    np.save(output, datasets)
+                    dataset.save(output)
             bar()
 
 def archive(cardamom_article, output_dir, archive_format):

@@ -23,6 +23,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinxcontrib.collections',
+    'sphinxcontrib.mermaid',
     'myst_nb',
     'sphinx_copybutton',
 ]
@@ -34,17 +35,25 @@ myst_enable_extensions = [
     'strikethrough',
     'tasklist',
 ]
+myst_fence_as_directive = {'mermaid'}
+mermaid_version ="10.9.1"
+mermaid_init_js = "mermaid.initialize({startOnLoad:true, theme: 'neutral', legacyMathML: true});"
+# mermaid_d3_zoom = True
 
 templates_path = ['_templates']
 exclude_patterns = []
 
+intersphinx_mapping = {
+    'harissa-framework': ('https://github.com/harissa-framework/', None),
+}
+
 collections = {
-        'notebooks' : {
-            'driver': 'copy_folder',
-            'source': str(Path(__file__).parent.parent.parent / 'notebooks'),
-            'ignore': ['.ipynb_checkpoints'],
-        }
+    'notebooks' : {
+        'driver': 'copy_folder',
+        'source': str(Path(__file__).parent.parent.parent / 'notebooks'),
+        'ignore': ['.ipynb_checkpoints'],
     }
+}
 
 autodoc_typehints = 'description'
 autosummary_generate = True
