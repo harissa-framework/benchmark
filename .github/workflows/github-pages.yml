@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install harissa
-        run: pip install -e .
+        run: pip install -i https://test.pypi.org/simple/ harissa
       - name: Setup documentation dependencies
         run: pip install -r docs/requirements.txt
       - name: Build documentation
