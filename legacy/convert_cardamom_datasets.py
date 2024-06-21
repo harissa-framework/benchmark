@@ -3,9 +3,9 @@ import numpy as np
 import argparse as ap
 from shutil import make_archive
 from tempfile import TemporaryDirectory
-from alive_progress import alive_bar
 
 from harissa import Dataset
+from harissa.utils.progress_bar import alive_bar
 from harissa.benchmark.generators.networks import NetworksGenerator, tree
 
 def convert(cardamom_article, output_dir):
