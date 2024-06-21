@@ -3,25 +3,19 @@ Benchmark for Harissa's inference and simulation methods.
 
 ## Installation
 
-`harissa-benchmark` depends on the version 4.1.0 of [harissa](https://github.com/harissa-framework/harissa). 
-This version is not released yet, so to be able to use this package you need to
-clone the `harissa` repository, switch branch to `add-cardamom` 
-and install it in local (with the extra dependencies).
-You can use a virtual environment if you have another version of harissa installed.
-Now that you have the correct version of `harissa`
-you can install `harissa-benchmark`.
+`harissa.benchmark` is introduced in the version [4.0.0a2](https://pypi.org/project/harissa/4.0.0a2/) of [harissa](https://github.com/harissa-framework/harissa). 
+This version is a pre-release, to install it you have to specify the version to pip.
 
 ```console
-git clone https://github.com/harissa-framework/harissa.git
-cd harissa
-git checkout add-cardamom
-pip install .[extra]
-pip install harissa-benchmark
+pip install harissa==4.0.0a2
 ```
+
+You can use a virtual environment if you have another version of harissa installed.
+Now that you have the correct version of `harissa` you can use `harissa.benchmark`.
 
 ## Usage
 
-By default this package contains some networks and inferences methods.
+By default this module contains some networks and inferences methods.
 You can display them with the functions `available_networks` and `available_inferences`.
 
 ```python
@@ -30,27 +24,38 @@ print(available_networks())
 print(available_inferences())
 ```
 
-To run a benchmark on those and generate scores, you only need to import the
-`Benchmark` class and to call its method `generate`. 
-The generated scores will be accessible inside the attribute `items` or the property
-`scores`.
+To run a benchmark on those and generate reports, you only need to import the
+`Benchmark` class, create a `Benchmark` instance and call its method `reports`.
+It creates [roc curves](https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html) and other statistics.
+This method returns matplotlib figures that you can display or manipulate as you wish.
 
 ```python
-from harissa_benchmark import Benchmark
+from harissa.benchmark import Benchmark
 benchmark = Benchmark()
-benchmark.generate()
-print(benchmark.scores.keys())
+figs = benchmark.reports()
+for fig in figs:
+    fig.show()
 ```
 
-It is a dictionary that contains another dictionary for each network which contains
-the results of the inference per inference method.
-You can create reports or statistic with them.
-For example you can display [roc](https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html) curves for every inference method for a given network.
-`harrisa-benchmark` provides helper class and functions to do it:
+`benchmark` is iterable and can be accessed like a dictionary. 
+
+See more information on `key` and `value` structure [here](notebooks/benchmark.ipynb).
 
 ```python
-from harissa_benchmark.plotters import UnDirectedPlotter
-network_name = 'BN8'
-plotter = UnDirectedPlotter(benchmark.networks[network_name])
-plotter.plot_roc_curves(benchmark.scores[network_name])
+for key, value in benchmark.items():
+    print(key, value)
+
+print(benchmark[key])
 ```
+However it does not store its values in memory ([generators](https://wiki.python.org/moin/Generators)).
+At every iteration or access, values are regenerated and can be different.
+To have same values every time, you can decide to save the values inside files thanks to the method `save`, then set the `path` of `benchmark` to where you saved to read those files when needed.
+
+For example:
+
+```python
+benchmark.save('path/to/my_benchmark')
+benchmark.path = 'path/to/my_benchmark'
+```
+
+Now benchmark will read files inside `path/to/my_benchmark` instead of generating data.
