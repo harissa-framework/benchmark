@@ -1,6 +1,6 @@
 # API documentation
 
-## Main package
+## Main module
 
 ```{eval-rst}
 .. autosummary::

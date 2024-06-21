@@ -19,6 +19,7 @@ maxdepth: 2
 caption: "Contents:"
 ---
 quickstart
+modules
 notebooks
 :::
 
