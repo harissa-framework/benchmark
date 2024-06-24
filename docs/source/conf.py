@@ -62,7 +62,7 @@ napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 
 nb_execution_mode = 'off'
-copybutton_exclude = '.linenos, .gp, .go, .o'
+copybutton_exclude = '.linenos, .gp, .go'
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
