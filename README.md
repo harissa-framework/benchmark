@@ -7,7 +7,7 @@ Benchmark for Harissa's inference and simulation methods.
 This version is a pre-release, to install it you have to specify the version to pip.
 
 ```bash
-$ pip install harissa==4.0.0a2
+pip install harissa==4.0.0a2
 ```
 
 You can use a virtual environment if you have another version of harissa installed.
