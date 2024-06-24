@@ -67,7 +67,25 @@ copybutton_exclude = '.linenos, .gp, .go, .o'
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'furo'
+html_theme = 'pydata_sphinx_theme'
+html_theme_options = {
+  'icon_links': [
+        {
+            'name': 'GitHub',
+            'url': "https://github.com/harissa-framework/benchmark",
+            'icon': 'fa-brands fa-github',
+            'type': 'fontawesome',
+        },
+        {
+            'name': 'Harissa',
+            'url': 'https://harissa-framework.github.io/harissa/',
+            'icon': 'fa-solid fa-pepper-hot',
+            'type': 'fontawesome',
+        }
+   ],
+   "pygment_light_style": "default",
+   "pygment_dark_style": "material",
+}
 html_static_path = ['_static']
 html_css_files = ['custom.css']
 html_copy_source = False

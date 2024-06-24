@@ -7,18 +7,9 @@
 
 :::{toctree}
 ---
-maxdepth: 1
----
-Harissa-Framework <https://github.com/harissa-framework/>
-Harissa <https://harissa-framework.github.io/harissa/>
-:::
-
-:::{toctree}
----
 maxdepth: 2
 caption: "Contents:"
 ---
-quickstart
 modules
 notebooks
 :::

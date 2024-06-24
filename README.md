@@ -6,8 +6,8 @@ Benchmark for Harissa's inference and simulation methods.
 `harissa.benchmark` is introduced in the version [4.0.0a2](https://pypi.org/project/harissa/4.0.0a2/) of [harissa](https://github.com/harissa-framework/harissa). 
 This version is a pre-release, to install it you have to specify the version to pip.
 
-```console
-pip install harissa==4.0.0a2
+```bash
+$ pip install harissa==4.0.0a2
 ```
 
 You can use a virtual environment if you have another version of harissa installed.

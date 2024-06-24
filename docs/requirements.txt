@@ -1,6 +1,6 @@
 harissa
 sphinx
-furo
+pydata-sphinx-theme
 ipython
 myst-parser
 myst-nb
