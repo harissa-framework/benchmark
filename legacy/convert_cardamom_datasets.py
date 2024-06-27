@@ -7,10 +7,14 @@ from tempfile import TemporaryDirectory
 from harissa import Dataset
 from harissa.utils.progress_bar import alive_bar
 from harissa.benchmark.generators.networks import NetworksGenerator, tree
+from harissa.plot import build_pos
 
 def convert(cardamom_article, output_dir):
     deterministic_networks = ['BN8', 'CN5', 'FN4', 'FN8']
-    network_gen = NetworksGenerator(include=deterministic_networks)
+    network_gen = NetworksGenerator(
+        include=deterministic_networks, 
+        verbose=True
+    )
     network_gen.save(output_dir)
 
     with alive_bar(len(list(cardamom_article.iterdir()))) as bar:
@@ -42,10 +46,11 @@ def convert(cardamom_article, output_dir):
                 # save networks interaction
                 for path in inters:
                     tree_name = f'{path.stem.split("_")[1]}.npz'
-                    inter = np.load(path)
+                    inter = np.load(path) * 10.0
                     network = tree(inter.shape[1] - 1)
                     # override interaction matrix
                     network.interaction[:] = inter
+                    network.layout = build_pos(inter)
                     network.save(networks_output / tree_name)
                 # save datasets
                 for path in old_datasets:
